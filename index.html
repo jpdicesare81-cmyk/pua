@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Púa</title>
+<meta name="description" content="Afinador y cancionero con tabs, autoscroll y seguimiento de voz.">
+<meta name="theme-color" content="#1d1613">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Púa">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;800&family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ AFINADOR ============ -->
+  <section id="view-tuner" class="view" aria-labelledby="tuner-title">
+    <header class="topbar">
+      <h1 id="tuner-title" class="brand">Púa</h1>
+      <label class="select-wrap">
+        <span class="sr-only">Afinación</span>
+        <select id="tuning-select"></select>
+      </label>
+    </header>
+
+    <div id="instrument-picker" class="segmented" role="group" aria-label="Instrumento"></div>
+
+    <div class="tuner">
+      <div class="readout" aria-live="polite">
+        <div id="note-big" class="note-big">–</div>
+        <div class="note-sub"><span id="note-solfa">toca una cuerda</span><span id="note-octave"></span></div>
+      </div>
+
+      <svg id="gauge" class="gauge" viewBox="0 0 320 180" role="img" aria-label="Desviación en cents">
+        <g id="gauge-ticks"></g>
+        <text x="40" y="172" class="gauge-label">♭</text>
+        <text x="280" y="172" class="gauge-label">♯</text>
+        <line id="needle" x1="160" y1="160" x2="160" y2="34" class="needle"></line>
+        <circle cx="160" cy="160" r="7" class="needle-hub"></circle>
+      </svg>
+
+      <div class="tuner-stats">
+        <span id="cents-out" class="stat">0 cents</span>
+        <span id="state-out" class="state-pill" data-state="idle">Esperando</span>
+        <span id="hz-out" class="stat">0.0 Hz</span>
+      </div>
+
+      <div id="strings" class="strings" role="group" aria-label="Cuerdas"></div>
+
+      <div class="tuner-options">
+        <label class="toggle"><input type="checkbox" id="auto-string" checked> <span>Detectar cuerda</span></label>
+        <div class="ref">
+          <button class="icon-btn" id="ref-down" aria-label="Bajar referencia">−</button>
+          <span id="ref-out">La = 440 Hz</span>
+          <button class="icon-btn" id="ref-up" aria-label="Subir referencia">+</button>
+        </div>
+      </div>
+      <p class="hint" id="tuner-hint">Con «Detectar cuerda» apagado, toca una cuerda de arriba para oír su nota de referencia.</p>
+    </div>
+
+    <button id="mic-btn" class="primary big" type="button">Activar micrófono</button>
+  </section>
+
+  <!-- ============ CANCIONES ============ -->
+  <section id="view-songs" class="view" hidden aria-labelledby="songs-title">
+    <header class="topbar">
+      <h1 id="songs-title" class="brand">Canciones</h1>
+      <button class="primary" id="new-song-btn" type="button">Nueva</button>
+    </header>
+    <label class="search">
+      <span class="sr-only">Buscar</span>
+      <input type="search" id="song-search" placeholder="Buscar por título o artista" autocomplete="off">
+    </label>
+    <ul id="song-list" class="song-list"></ul>
+    <div class="list-footer">
+      <button class="ghost" id="export-btn" type="button">Exportar copia</button>
+      <label class="ghost file-btn">Importar copia<input type="file" id="import-input" accept="application/json,.json" hidden></label>
+    </div>
+    <p class="hint">Las canciones se guardan en este teléfono. Exporta una copia de vez en cuando.</p>
+  </section>
+
+  <!-- ============ EDITOR ============ -->
+  <section id="view-editor" class="view" hidden aria-labelledby="editor-title">
+    <header class="topbar">
+      <button class="ghost" id="editor-cancel" type="button">Cancelar</button>
+      <h1 id="editor-title" class="brand small">Nueva canción</h1>
+      <button class="primary" id="editor-save" type="button">Guardar</button>
+    </header>
+    <form id="editor-form" class="editor">
+      <div class="row2">
+        <label>Título<input id="ed-title" required autocomplete="off"></label>
+        <label>Artista<input id="ed-artist" autocomplete="off"></label>
+      </div>
+      <div class="row3">
+        <label>Capo<input id="ed-capo" type="number" min="0" max="12" inputmode="numeric" value="0"></label>
+        <label>Velocidad<input id="ed-speed" type="number" min="1" max="20" inputmode="numeric" value="5"></label>
+        <label>Tono<input id="ed-key" autocomplete="off" placeholder="Am"></label>
+      </div>
+      <div class="find-tab">
+        <span>Buscar tab en</span>
+        <a id="find-lacuerda" class="chip-btn" href="https://acordes.lacuerda.net/" target="_blank" rel="noopener">LaCuerda</a>
+        <a id="find-cifra" class="chip-btn" href="https://www.cifraclub.com/" target="_blank" rel="noopener">Cifra Club</a>
+        <a id="find-ug" class="chip-btn" href="https://www.ultimate-guitar.com/" target="_blank" rel="noopener">Ultimate Guitar</a>
+      </div>
+      <label class="grow">Letra, acordes y tabs
+        <textarea id="ed-body" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="Pega aquí la canción tal como la copias de una página de tabs."></textarea>
+      </label>
+      <details class="help">
+        <summary>Cómo escribir la canción</summary>
+        <ul>
+          <li>Pega acordes sobre la letra tal cual: Púa reconoce las líneas de acordes y las de tablatura.</li>
+          <li>También sirve el formato con acordes entre corchetes: <code>[Am]Hoy te [F]vi</code>.</li>
+          <li>Títulos de sección: <code>[Coro]</code>, <code>[Intro]</code>, <code>[Verso 1]</code>.</li>
+          <li>Para practicar la melodía, agrega antes de una línea las notas: <code>{notas: E4 G4 A4}</code> o <code>{notas: Mi4 Sol4 La4}</code>.</li>
+        </ul>
+      </details>
+      <div id="delete-zone" class="delete-zone" hidden>
+        <button class="danger-ghost" id="delete-btn" type="button">Borrar canción</button>
+        <div id="delete-confirm" class="confirm" hidden>
+          <span>¿Borrar esta canción del teléfono?</span>
+          <button class="danger" id="delete-yes" type="button">Sí, borrar</button>
+          <button class="ghost" id="delete-no" type="button">No</button>
+        </div>
+      </div>
+    </form>
+  </section>
+
+  <!-- ============ CANCIÓN ============ -->
+  <section id="view-song" class="view song-view" hidden aria-labelledby="song-title">
+    <header class="topbar song-top">
+      <button class="ghost" id="song-back" type="button" aria-label="Volver a canciones">‹ Canciones</button>
+      <div class="song-head">
+        <h1 id="song-title" class="brand small"></h1>
+        <p id="song-meta" class="song-meta"></p>
+      </div>
+      <button class="ghost" id="song-edit" type="button">Editar</button>
+    </header>
+
+    <div id="song-scroll" class="song-scroll">
+      <div id="song-body" class="song-body"></div>
+      <div class="song-end">Fin</div>
+    </div>
+    <div class="playhead" aria-hidden="true"></div>
+
+    <div id="voice-panel" class="voice-panel" hidden>
+      <div class="voice-head">
+        <span id="voice-note" class="voice-note">–</span>
+        <div id="target-chips" class="target-chips"><span class="muted">Esta línea no tiene notas de melodía.</span></div>
+        <span id="line-score" class="line-score"></span>
+      </div>
+      <canvas id="voice-canvas" height="90"></canvas>
+    </div>
+
+    <div class="song-controls">
+      <div class="ctl-group">
+        <button class="icon-btn" id="speed-down" aria-label="Más lento">−</button>
+        <span class="ctl-label" id="speed-out">Vel 5</span>
+        <button class="icon-btn" id="speed-up" aria-label="Más rápido">+</button>
+      </div>
+      <button class="play" id="play-btn" type="button" aria-label="Iniciar desplazamiento">▶</button>
+      <div class="ctl-group">
+        <button class="icon-btn" id="transpose-down" aria-label="Bajar medio tono">♭</button>
+        <span class="ctl-label" id="transpose-out">Tono 0</span>
+        <button class="icon-btn" id="transpose-up" aria-label="Subir medio tono">♯</button>
+      </div>
+      <div class="ctl-row">
+        <button class="chip-btn" id="font-down" type="button" aria-label="Letra más chica">A−</button>
+        <button class="chip-btn" id="font-up" type="button" aria-label="Letra más grande">A+</button>
+        <button class="chip-btn" id="voice-btn" type="button" aria-pressed="false">Voz y notas</button>
+        <button class="chip-btn" id="follow-btn" type="button" aria-pressed="false" title="El texto avanza solo mientras suena la guitarra o tu voz">Avanzar con sonido</button>
+      </div>
+    </div>
+  </section>
+
+  <nav class="tabbar" id="tabbar" aria-label="Secciones">
+    <button class="tab" data-view="tuner" aria-current="page" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18a8 8 0 1 1 16 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M12 18 15.5 9.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <span>Afinar</span>
+    </button>
+    <button class="tab" data-view="songs" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V6l10-2v12" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="6.5" cy="18" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="16.5" cy="16" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+      <span>Canciones</span>
+    </button>
+  </nav>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+</div>
+<script src="pitch.js"></script>
+<script src="songs.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
