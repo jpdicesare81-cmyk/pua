@@ -75,6 +75,37 @@
       <h1 id="songs-title" class="brand">Canciones</h1>
       <button class="primary" id="new-song-btn" type="button">Nueva</button>
     </header>
+    <section class="import-card" aria-labelledby="import-title">
+      <h2 id="import-title" class="import-title">Importar una canción</h2>
+      <ol class="import-steps">
+        <li>
+          <label for="import-query" class="step-label">Escribe la canción y el artista</label>
+          <input id="import-query" type="search" placeholder="Ej.: La flaca - Jarabe de Palo" autocomplete="off" autocapitalize="words">
+        </li>
+        <li>
+          <span class="step-label">Búscala y copia la página</span>
+          <div class="import-sites">
+            <a id="imp-lacuerda" class="chip-btn" href="https://acordes.lacuerda.net/" target="_blank" rel="noopener">LaCuerda</a>
+            <a id="imp-ug" class="chip-btn" href="https://www.ultimate-guitar.com/" target="_blank" rel="noopener">Ultimate Guitar</a>
+            <a id="imp-cifra" class="chip-btn" href="https://www.cifraclub.com/" target="_blank" rel="noopener">Cifra Club</a>
+          </div>
+          <p class="step-help">En la canción, mantén el dedo sobre el texto y toca «Seleccionar todo» y después «Copiar».</p>
+        </li>
+        <li>
+          <span class="step-label">Vuelve aquí y pégala</span>
+          <button class="primary" id="paste-btn" type="button">Pegar canción</button>
+        </li>
+      </ol>
+      <div id="paste-fallback" class="paste-fallback" hidden>
+        <label for="paste-area" class="step-label">Mantén el dedo en el recuadro y toca «Pegar»</label>
+        <textarea id="paste-area" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
+        <div class="paste-actions">
+          <button class="primary" id="paste-import" type="button">Importar</button>
+          <button class="ghost" id="paste-cancel" type="button">Cancelar</button>
+        </div>
+      </div>
+    </section>
+
     <label class="search">
       <span class="sr-only">Buscar</span>
       <input type="search" id="song-search" placeholder="Buscar por título o artista" autocomplete="off">

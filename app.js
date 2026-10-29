@@ -346,6 +346,49 @@
     }
   });
 
+  // ---------- quick import ----------
+  function updateImportLinks() {
+    const q = $("import-query").value.trim();
+    const words = q.replace(/\s+[-–—]\s+/g, " ");
+    $("imp-lacuerda").href = q ? `https://acordes.lacuerda.net/busca.php?exp=${encodeURIComponent(words)}` : "https://acordes.lacuerda.net/";
+    $("imp-ug").href = q ? `https://www.ultimate-guitar.com/search.php?search_type=title&value=${encodeURIComponent(words)}` : "https://www.ultimate-guitar.com/";
+    $("imp-cifra").href = q ? `https://duckduckgo.com/?q=${encodeURIComponent(words + " site:cifraclub.com")}` : "https://www.cifraclub.com/";
+  }
+  $("import-query").addEventListener("input", updateImportLinks);
+
+  function importText(text) {
+    if (!text || !text.trim()) { toast("No hay texto para importar. Copia la canción y vuelve a intentarlo."); return false; }
+    const r = Songs.cleanImport(text, $("import-query").value);
+    if (!r.body.trim()) { toast("No encontré una canción en el texto pegado.", 4000); return false; }
+    const song = {
+      id: Songs.newId(), title: r.title, artist: r.artist, capo: r.capo, speed: 5, key: r.key,
+      body: r.body, transpose: 0, fontSize: 15, example: false
+    };
+    if (!Store.upsert(song)) { toast("No se pudo guardar: el almacenamiento del teléfono está lleno o bloqueado.", 5000); return false; }
+    $("import-query").value = "";
+    updateImportLinks();
+    $("paste-area").value = "";
+    $("paste-fallback").hidden = true;
+    openSong(song.id);
+    toast(r.stats.hasMusic
+      ? "Canción importada. Si algo quedó mal, toca «Editar»."
+      : "Importé el texto, pero no encontré acordes. Revísalo con «Editar».", 4000);
+    return true;
+  }
+
+  $("paste-btn").addEventListener("click", async () => {
+    let text = "";
+    try {
+      if (navigator.clipboard && navigator.clipboard.readText) text = await navigator.clipboard.readText();
+    } catch (e) { text = ""; }
+    if (text && text.trim()) { importText(text); return; }
+    // Clipboard reading refused or empty: let the user paste into a box instead.
+    $("paste-fallback").hidden = false;
+    $("paste-area").focus();
+  });
+  $("paste-import").addEventListener("click", () => importText($("paste-area").value));
+  $("paste-cancel").addEventListener("click", () => { $("paste-area").value = ""; $("paste-fallback").hidden = true; });
+
   // =====================================================================
   // EDITOR
   // =====================================================================

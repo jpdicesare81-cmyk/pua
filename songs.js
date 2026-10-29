@@ -131,6 +131,137 @@
     return segs.filter((s, i) => i > 0 || s.chord || s.text);
   }
 
+  // ---------- quick import ----------
+  // Cleans text copied from a whole tab page (menus, ads, ratings, footer) down to the song,
+  // and picks up title, artist, key and capo when the page shows them.
+  const JUNK_RE = new RegExp("^(?:" + [
+    "publicidad", "anuncio", "advertisement", "sponsored", "imprimir", "print", "compartir", "share",
+    "descargar.*", "download.*", "pdf", "transponer.*", "transpose.*", "autoscroll.*", "auto ?scroll.*",
+    "tama[ñn]o.*", "font.*", "ocultar.*", "mostrar.*", "show .*", "hide .*", "ver (?:video|v[ií]deo|acordes|diagramas).*",
+    "video", "tutorial.*", "comentarios?.*", "comments?.*", "iniciar sesi[oó]n", "registrarse", "reg[ií]strate.*", "log ?in", "sign ?up",
+    "cookies?.*", "pol[ií]tica de privacidad.*", "privacy.*", "t[eé]rminos.*", "terms.*", "contacto", "contact us",
+    "(?:©|\\(c\\)|copyright).*", "todos los derechos.*", "all rights reserved.*",
+    "calificar.*", "valoraci[oó]n.*", "votos?.*", "rating.*", "rate this.*", "[0-9.,]+ ?(?:★|estrellas|stars).*", "★+.*",
+    "siguiente", "anterior", "next", "previous", "volver.*", "inicio", "home", "men[uú]", "buscar.*", "search.*",
+    "facebook", "twitter", "x", "whatsapp", "instagram", "telegram", "pinterest", "email", "e-mail", "copiar enlace", "copy link",
+    "lacuerda(?:\\.net)?.*", "cifra ?club.*", "ultimate[- ]guitar.*", "tabs?", "acordes", "chords", "letra", "lyrics", "tablatura", "tablature",
+    "versi[oó]n \\d+.*", "ver(?:sion)? \\d+.*", "dificultad.*", "difficulty.*", "nivel.*", "strumming.*", "rasgueo.*",
+    "acordes usados.*", "chords used.*", "diagramas.*", "afinaci[oó]n.*", "tuning.*", "key.*", "tono.*", "capo.*", "capotraste.*",
+    "enviado por.*", "subido por.*", "submitted by.*", "transcri(?:to|bed) por.*", "author.*", "autor.*", "visitas.*", "views.*",
+    "a[ñn]adir a .*", "agregar a .*", "add to .*", "favoritos", "favorites", "playlist.*", "reportar.*", "report.*", "editar", "edit",
+    "\\d{1,3}(?:[.,]\\d{3})* (?:visitas|views|vistas).*", "\\d+"
+  ].join("|") + ")$", "i");
+
+  const KEY_RE = /(?:^|\s)(?:tono|tonalidad|key)\s*[:=-]?\s*((?:[A-G]|Do|Re|Mi|Fa|Sol|La|Si)(?:#|b)?m?)\b/i;
+  const CAPO_RE = /\bcapo(?:traste)?\s*(?:en(?: el)?|on|:|-)?\s*(\d{1,2})/i;
+
+  function isMusicLine(type) { return type === "chords" || type === "tab" || type === "chordpro"; }
+
+  function cleanImport(text, hint) {
+    const raw = String(text || "")
+      .replace(/\r\n?/g, "\n")
+      .replace(/[   ]/g, " ")
+      .replace(/[​-‍﻿]/g, "")
+      .replace(/\t/g, "    ");
+    const lines = raw.split("\n").map(l => l.replace(/\s+$/, ""));
+
+    const keyM = raw.match(KEY_RE);
+    const capoM = raw.match(CAPO_RE);
+
+    // Drop page furniture, but only short lines that are entirely a known label.
+    const kept = lines.filter(l => {
+      const t = l.trim();
+      if (!t) return true;
+      return !(t.length <= 60 && JUNK_RE.test(t.replace(/[:·•|»›]+\s*$/, "").trim()));
+    });
+
+    const types = kept.map(l => classify(l).type);
+    let first = types.findIndex(isMusicLine);
+    let last = -1;
+    for (let i = types.length - 1; i >= 0; i--) if (isMusicLine(types[i])) { last = i; break; }
+
+    let header = [], body;
+    if (first < 0) {
+      body = kept;  // Lyrics only: keep everything that survived the filter.
+    } else {
+      // Include section headers and lyric lines that sit right above the first chord line.
+      let start = first;
+      while (start > 0 && (types[start - 1] === "section" || (types[start - 1] === "lyric" && kept[start - 1].trim().length < 40 && /^\s*(intro|verso|coro|estribillo|puente|solo|final|outro|pre)/i.test(kept[start - 1])))) start--;
+      // Carry on past the last chord line through the lyric paragraph that follows it.
+      let end = last;
+      let blanks = 0;
+      for (let i = last + 1; i < kept.length; i++) {
+        if (types[i] === "blank") { if (++blanks >= 2) break; continue; }
+        if (types[i] !== "lyric" && types[i] !== "section") break;
+        if (blanks && i - end > 12) break;
+        blanks = 0;
+        end = i;
+      }
+      header = kept.slice(0, start);
+      body = kept.slice(start, end + 1);
+    }
+
+    // Collapse runs of blank lines and trim the ends.
+    const tidy = [];
+    for (const l of body) {
+      if (!l.trim() && (!tidy.length || !tidy[tidy.length - 1].trim())) continue;
+      tidy.push(l);
+    }
+    while (tidy.length && !tidy[tidy.length - 1].trim()) tidy.pop();
+
+    // Title and artist: what the user typed wins; otherwise a "Song - Artist" style header line.
+    let title = "", artist = "";
+    const q = String(hint || "").trim();
+    if (q) {
+      const parts = q.split(/\s+[-–—]\s+|\s+de\s+(?=[A-ZÁÉÍÓÚÑ])/);
+      title = parts[0].trim();
+      artist = (parts[1] || "").trim();
+    } else {
+      const strip = (s) => s
+        .replace(/\s*\((?:acordes|chords|tabs?|letra|tablatura|ver\.?\s*\d+)[^)]*\)\s*$/i, "")
+        .replace(/^(?:acordes de|chords for|letra de|tabs? de)\s+/i, "")
+        .replace(/\s+(?:acordes|chords|tabs?|letra|tablatura|ukulele|bass)(?:\s+(?:y|and)\s+\w+)?$/i, "")
+        .trim();
+      const cand = header.map(l => l.trim()).filter(l => l && l.length <= 120);
+      const nice = (s) => {
+        s = strip(s.replace(/\s*\((?:tab|acordes|chords|letra|ver\.?\s*\d+)\)\s*$/i, ""));
+        if (s === s.toUpperCase()) s = s.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
+        return s.charAt(0).toUpperCase() + s.slice(1);
+      };
+      // Breadcrumb: "Acordes de Guitarra » J » Artista » Canción (Tab)".
+      const crumb = cand.find(l => (l.match(/\s*[»›]\s*/g) || []).length >= 2);
+      if (crumb) {
+        const parts = crumb.split(/\s*[»›]\s*/).map(s => s.trim()).filter(Boolean);
+        title = nice(parts[parts.length - 1]);
+        artist = nice(parts[parts.length - 2]);
+      }
+      // "CANCIÓN: Acordes y Letra para Guitarra (Artista)".
+      if (!title) for (const l of cand) {
+        const m = l.match(/^(.+?):\s*(?:acordes|chords|tabs?|letra)\b.*\(([^)]+)\)\s*$/i);
+        if (m) { title = nice(m[1]); artist = nice(m[2]); break; }
+      }
+      for (const l of title ? [] : cand) {
+        if (l.length > 80) continue;
+        // "Song Chords by Artist" / "Canción, acordes por Artista": song first.
+        let m = l.match(/^(.+?)\s+(?:by|por)\s+(.+)$/i);
+        if (m) { title = strip(m[1].replace(/,\s*$/, "")); artist = strip(m[2]); break; }
+        // "Artista - Canción": the usual order on Spanish tab sites.
+        m = l.match(/^(.+?)\s+[-–—:]\s+(.+)$/);
+        if (m) { artist = strip(m[1]); title = strip(m[2]); break; }
+      }
+      if (!title && cand.length) title = strip(cand[cand.length - 1]);
+    }
+
+    return {
+      title: title || "Canción importada",
+      artist,
+      key: keyM ? keyM[1] : "",
+      capo: capoM ? Math.min(12, +capoM[1]) : 0,
+      body: tidy.join("\n"),
+      stats: { kept: tidy.length, dropped: lines.length - tidy.length, hasMusic: first >= 0 }
+    };
+  }
+
   // ---------- storage ----------
   const KEY = "pua.songs.v1";
   const Store = {
@@ -230,5 +361,5 @@
     ];
   }
 
-  window.Pua.Songs = { Store, parse, classify, chordproSegments, transposeChord, transposeChordLine, isChord, newId };
+  window.Pua.Songs = { Store, parse, classify, chordproSegments, transposeChord, transposeChordLine, isChord, newId, cleanImport };
 })();

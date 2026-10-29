@@ -163,6 +163,28 @@ button { cursor: pointer; }
 .ref .icon-btn { width: 34px; height: 34px; }
 .hint { color: var(--muted); font-size: .85rem; margin: 0; text-align: center; max-width: 46ch; align-self: center; }
 
+/* ---------- quick import ---------- */
+.import-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 10px; }
+.import-title { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: 1.3rem; letter-spacing: .02em; }
+.import-steps { margin: 0; padding: 0; list-style: none; counter-reset: step; display: flex; flex-direction: column; gap: 14px; }
+.import-steps li { counter-increment: step; display: grid; grid-template-columns: 28px 1fr; column-gap: 10px; row-gap: 6px; align-items: start; }
+.import-steps li::before {
+  content: counter(step); grid-row: 1 / span 3; width: 28px; height: 28px; border-radius: 50%;
+  display: grid; place-items: center; background: var(--surface-2); color: var(--accent); font-weight: 700; font-family: var(--font-mono); font-size: .85rem;
+}
+.import-steps li > * { grid-column: 2; min-width: 0; }
+.step-label { font-weight: 700; font-size: .92rem; }
+.step-help { margin: 0; color: var(--muted); font-size: .82rem; }
+.import-steps input, .paste-fallback textarea {
+  width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 16px; color: var(--fg);
+}
+.import-sites { display: flex; flex-wrap: wrap; gap: 6px; }
+.import-sites a { color: var(--fg); text-decoration: none; }
+#paste-btn { justify-self: start; }
+.paste-fallback { display: flex; flex-direction: column; gap: 8px; }
+.paste-fallback textarea { min-height: 140px; font-family: var(--font-mono); font-size: 14px; }
+.paste-actions { display: flex; gap: 8px; }
+
 /* ---------- songs list ---------- */
 .search input {
   width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px;
